@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -18,17 +18,27 @@ interface NoteCreateFormProps {
   isSubmitting?: boolean
   initialTitle?: string
   initialContent?: string
+  onTitleChange?: (title: string) => void
+  onContentChange?: (content: string) => void
 }
 
 export function NoteCreateForm({ 
   onSubmit, 
   isSubmitting = false,
   initialTitle = '',
-  initialContent = ''
+  initialContent = '',
+  onTitleChange,
+  onContentChange
 }: NoteCreateFormProps) {
   const [title, setTitle] = useState(initialTitle)
   const [content, setContent] = useState(initialContent)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
+
+  // initialTitle/initialContent 변경 시 업데이트
+  useEffect(() => {
+    setTitle(initialTitle)
+    setContent(initialContent)
+  }, [initialTitle, initialContent])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,18 +59,28 @@ export function NoteCreateForm({
   }
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value)
+    const newTitle = e.target.value
+    setTitle(newTitle)
     // 입력 중 에러 메시지 제거
     if (errors.title) {
       setErrors(prev => ({ ...prev, title: undefined }))
     }
+    // 부모 컴포넌트에 변경 알림
+    if (onTitleChange) {
+      onTitleChange(newTitle)
+    }
   }
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value)
+    const newContent = e.target.value
+    setContent(newContent)
     // 입력 중 에러 메시지 제거
     if (errors.content) {
       setErrors(prev => ({ ...prev, content: undefined }))
+    }
+    // 부모 컴포넌트에 변경 알림
+    if (onContentChange) {
+      onContentChange(newContent)
     }
   }
 
