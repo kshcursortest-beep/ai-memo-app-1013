@@ -243,5 +243,96 @@ describe('NoteCreateForm', () => {
       expect(contentTextarea.value).toBe('')
     })
   })
+
+  describe('템플릿 초기값', () => {
+    it('initialTitle prop이 주어지면 제목 필드에 초기값이 설정된다', () => {
+      render(<NoteCreateForm onSubmit={mockOnSubmit} initialTitle="회의 노트 - " />)
+
+      const titleInput = screen.getByLabelText(/제목/) as HTMLInputElement
+      expect(titleInput.value).toBe('회의 노트 - ')
+    })
+
+    it('initialContent prop이 주어지면 본문 필드에 초기값이 설정된다', () => {
+      const initialContent = '## 참석자\n\n\n## 안건\n\n'
+      render(
+        <NoteCreateForm
+          onSubmit={mockOnSubmit}
+          initialContent={initialContent}
+        />
+      )
+
+      const contentTextarea = screen.getByLabelText('본문') as HTMLTextAreaElement
+      expect(contentTextarea.value).toBe(initialContent)
+    })
+
+    it('제목과 본문 초기값을 모두 설정할 수 있다', () => {
+      const initialTitle = '회의 노트 - '
+      const initialContent = '## 참석자\n\n'
+      render(
+        <NoteCreateForm
+          onSubmit={mockOnSubmit}
+          initialTitle={initialTitle}
+          initialContent={initialContent}
+        />
+      )
+
+      const titleInput = screen.getByLabelText(/제목/) as HTMLInputElement
+      const contentTextarea = screen.getByLabelText('본문') as HTMLTextAreaElement
+
+      expect(titleInput.value).toBe(initialTitle)
+      expect(contentTextarea.value).toBe(initialContent)
+    })
+
+    it('초기값이 있어도 사용자가 수정할 수 있다', async () => {
+      const user = userEvent.setup()
+      const initialTitle = '회의 노트 - '
+      const initialContent = '## 참석자\n\n'
+      render(
+        <NoteCreateForm
+          onSubmit={mockOnSubmit}
+          initialTitle={initialTitle}
+          initialContent={initialContent}
+        />
+      )
+
+      const titleInput = screen.getByLabelText(/제목/)
+      const contentTextarea = screen.getByLabelText('본문')
+
+      await user.clear(titleInput)
+      await user.type(titleInput, '새 제목')
+
+      await user.clear(contentTextarea)
+      await user.type(contentTextarea, '새 본문')
+
+      expect((titleInput as HTMLInputElement).value).toBe('새 제목')
+      expect((contentTextarea as HTMLTextAreaElement).value).toBe('새 본문')
+    })
+
+    it('초기값이 있는 상태에서 제출하면 올바른 값으로 onSubmit이 호출된다', async () => {
+      const user = userEvent.setup()
+      const initialTitle = '회의 노트 - '
+      const initialContent = '## 참석자\n\n'
+      render(
+        <NoteCreateForm
+          onSubmit={mockOnSubmit}
+          initialTitle={initialTitle}
+          initialContent={initialContent}
+        />
+      )
+
+      const titleInput = screen.getByLabelText(/제목/)
+      await user.type(titleInput, '2024-01-15')
+
+      const submitButton = screen.getByRole('button', { name: '노트 생성' })
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          '회의 노트 - 2024-01-15',
+          initialContent
+        )
+      })
+    })
+  })
 })
 

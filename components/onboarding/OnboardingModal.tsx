@@ -23,6 +23,7 @@ interface OnboardingModalProps {
   open: boolean
   onComplete: () => Promise<{ error?: string; success?: boolean }>
   onSkip: () => Promise<{ error?: string; success?: boolean }>
+  onOpenChange?: (open: boolean) => void
 }
 
 const ONBOARDING_STEPS = [
@@ -46,7 +47,7 @@ const ONBOARDING_STEPS = [
   },
 ]
 
-export function OnboardingModal({ open, onComplete, onSkip }: OnboardingModalProps) {
+export function OnboardingModal({ open, onComplete, onSkip, onOpenChange }: OnboardingModalProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
@@ -106,7 +107,7 @@ export function OnboardingModal({ open, onComplete, onSkip }: OnboardingModalPro
   const step = ONBOARDING_STEPS[currentStep]
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={onOpenChange || (() => {})}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <div className="mb-4 text-center text-6xl">{step.icon}</div>

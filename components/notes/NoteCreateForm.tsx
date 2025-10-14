@@ -16,11 +16,18 @@ import { Loader2 } from 'lucide-react'
 interface NoteCreateFormProps {
   onSubmit: (title: string, content: string) => Promise<void>
   isSubmitting?: boolean
+  initialTitle?: string
+  initialContent?: string
 }
 
-export function NoteCreateForm({ onSubmit, isSubmitting = false }: NoteCreateFormProps) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+export function NoteCreateForm({ 
+  onSubmit, 
+  isSubmitting = false,
+  initialTitle = '',
+  initialContent = ''
+}: NoteCreateFormProps) {
+  const [title, setTitle] = useState(initialTitle)
+  const [content, setContent] = useState(initialContent)
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
 
   const handleSubmit = async (e: React.FormEvent) => {

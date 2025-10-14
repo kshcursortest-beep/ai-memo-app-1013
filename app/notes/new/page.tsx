@@ -1,23 +1,27 @@
 // app/notes/new/page.tsx
 // 노트 생성 페이지
-// 사용자가 새로운 노트를 작성할 수 있는 페이지
-// 관련 파일: components/notes/NoteCreateForm.tsx, app/actions/notes.ts
+// 사용자가 새로운 노트를 작성할 수 있는 페이지 (템플릿 지원)
+// 관련 파일: components/notes/NoteCreateForm.tsx, app/actions/notes.ts, lib/types/templates.ts
 
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { NoteCreateForm } from '@/components/notes/NoteCreateForm'
 import { createNote } from '@/app/actions/notes'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { getTemplateById } from '@/lib/types/templates'
 
 export default function NewNotePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [initialTitle, setInitialTitle] = useState('')
+  const [initialContent, setInitialContent] = useState('')
 
-  // 사용자 인증 확인
+  // 사용자 인증 확인 및 템플릿 적용
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient()
@@ -26,12 +30,22 @@ export default function NewNotePage() {
       if (!user) {
         router.push('/login')
       } else {
+        // 템플릿 ID가 있으면 템플릿 적용
+        const templateId = searchParams.get('template')
+        if (templateId) {
+          const template = getTemplateById(templateId)
+          if (template) {
+            setInitialTitle(template.content.title)
+            setInitialContent(template.content.body)
+            toast.info(`"${template.title}" 템플릿이 적용되었습니다`)
+          }
+        }
         setIsLoading(false)
       }
     }
 
     checkAuth()
-  }, [router])
+  }, [router, searchParams])
 
   const handleSubmit = async (title: string, content: string) => {
     setIsSubmitting(true)
@@ -74,7 +88,12 @@ export default function NewNotePage() {
       </div>
 
       <div className="rounded-lg border bg-card p-6 shadow-sm">
-        <NoteCreateForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+        <NoteCreateForm 
+          onSubmit={handleSubmit} 
+          isSubmitting={isSubmitting}
+          initialTitle={initialTitle}
+          initialContent={initialContent}
+        />
       </div>
     </div>
   )

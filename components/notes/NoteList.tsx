@@ -17,12 +17,14 @@ interface Note {
 
 interface NoteListProps {
   notes: Note[]
+  hasCompletedOnboarding?: boolean
+  onShowOnboarding?: () => void
 }
 
-export function NoteList({ notes }: NoteListProps) {
+export function NoteList({ notes, hasCompletedOnboarding = true, onShowOnboarding }: NoteListProps) {
   // 노트가 없는 경우 빈 상태 UI 표시
   if (notes.length === 0) {
-    return <EmptyState />
+    return <EmptyState hasCompletedOnboarding={hasCompletedOnboarding} onShowOnboarding={onShowOnboarding} />
   }
 
   // 반응형 그리드 레이아웃

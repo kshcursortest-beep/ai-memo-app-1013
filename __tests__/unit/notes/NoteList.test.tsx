@@ -78,13 +78,13 @@ describe('NoteList Component', () => {
     it('노트가 없을 때 빈 상태 UI를 표시한다', () => {
       render(<NoteList notes={[]} />)
 
-      expect(screen.getByText('아직 작성한 노트가 없습니다')).toBeInTheDocument()
+      expect(screen.getByText('환영합니다! 🎉')).toBeInTheDocument()
     })
 
-    it('빈 상태에서 "새 노트 작성" 버튼을 표시한다', () => {
+    it('빈 상태에서 "첫 노트 작성하기" 버튼을 표시한다', () => {
       render(<NoteList notes={[]} />)
 
-      const button = screen.getByRole('button', { name: '새 노트 작성' })
+      const button = screen.getByRole('button', { name: '첫 노트 작성하기' })
       expect(button).toBeInTheDocument()
     })
 
