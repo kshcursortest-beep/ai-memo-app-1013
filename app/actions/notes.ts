@@ -177,7 +177,7 @@ export async function getNotes(
 /**
  * 노트 상세 조회
  * @param noteId - 조회할 노트 ID
- * @returns 노트 상세 정보 또는 에러 메시지
+ * @returns 노트 상세 정보 (요약 포함) 또는 에러 메시지
  */
 export async function getNoteById(
   noteId: string
@@ -189,6 +189,12 @@ export async function getNoteById(
     content: string
     createdAt: Date
     updatedAt: Date
+    summary?: {
+      id: string
+      content: string
+      model: string
+      createdAt: Date
+    } | null
   }
   error?: string
 }> {
@@ -212,18 +218,13 @@ export async function getNoteById(
       }
     }
 
-    // 3. 노트 조회 (사용자 스코프 강제)
-    const [note] = await db
-      .select({
-        id: notes.id,
-        title: notes.title,
-        content: notes.content,
-        createdAt: notes.createdAt,
-        updatedAt: notes.updatedAt,
-      })
-      .from(notes)
-      .where(and(eq(notes.id, noteId), eq(notes.userId, user.id)))
-      .limit(1)
+    // 3. 노트 조회 (요약 포함, Drizzle relations 활용)
+    const note = await db.query.notes.findFirst({
+      where: and(eq(notes.id, noteId), eq(notes.userId, user.id)),
+      with: {
+        summary: true,
+      },
+    })
 
     // 4. 노트 없음 (존재하지 않거나 권한 없음)
     if (!note) {
@@ -235,7 +236,14 @@ export async function getNoteById(
 
     return {
       success: true,
-      data: note,
+      data: {
+        id: note.id,
+        title: note.title,
+        content: note.content,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        summary: note.summary || null,
+      },
     }
   } catch (error) {
     console.error('노트 조회 실패:', error)

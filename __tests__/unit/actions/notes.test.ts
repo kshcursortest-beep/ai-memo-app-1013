@@ -608,33 +608,41 @@ describe('getNoteById Server Action', () => {
     })
 
     it('정상적으로 노트를 조회한다', async () => {
-      // Given: DB에 노트 존재
-      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([mockNote]),
-          }),
-        }),
-      })
+      // Given: DB에 노트 존재 (db.query.notes.findFirst 사용)
+      const mockDb = {
+        query: {
+          notes: {
+            findFirst: jest.fn().mockResolvedValue({
+              ...mockNote,
+              summary: null,
+            }),
+          },
+        },
+      }
+      ;(db as any).query = mockDb.query
 
       // When: 노트 조회
       const result = await getNoteById('note-123')
 
       // Then: 성공 응답
       expect(result.success).toBe(true)
-      expect(result.data).toEqual(mockNote)
+      expect(result.data).toEqual({
+        ...mockNote,
+        summary: null,
+      })
       expect(result.error).toBeUndefined()
     })
 
     it('존재하지 않는 노트 ID로 조회 시 에러를 반환한다', async () => {
       // Given: DB에 노트 없음
-      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([]),
-          }),
-        }),
-      })
+      const mockDb = {
+        query: {
+          notes: {
+            findFirst: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+      }
+      ;(db as any).query = mockDb.query
 
       // When: 존재하지 않는 노트 조회
       const result = await getNoteById('non-existent-id')
@@ -647,13 +655,14 @@ describe('getNoteById Server Action', () => {
 
     it('다른 사용자의 노트는 조회할 수 없다 (사용자 스코프 검증)', async () => {
       // Given: 다른 사용자의 노트 (WHERE 조건으로 필터링됨)
-      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([]), // 권한 없어서 빈 배열
-          }),
-        }),
-      })
+      const mockDb = {
+        query: {
+          notes: {
+            findFirst: jest.fn().mockResolvedValue(undefined), // 권한 없어서 undefined
+          },
+        },
+      }
+      ;(db as any).query = mockDb.query
 
       // When: 다른 사용자의 노트 조회 시도
       const result = await getNoteById('other-user-note-id')
@@ -681,13 +690,14 @@ describe('getNoteById Server Action', () => {
 
     it('DB 에러 발생 시 적절한 에러 메시지를 반환한다', async () => {
       // Given: DB 에러 발생
-      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockRejectedValue(new Error('DB Error')),
-          }),
-        }),
-      })
+      const mockDb = {
+        query: {
+          notes: {
+            findFirst: jest.fn().mockRejectedValue(new Error('DB Error')),
+          },
+        },
+      }
+      ;(db as any).query = mockDb.query
 
       // When: 노트 조회 시도
       const result = await getNoteById('note-123')

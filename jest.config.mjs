@@ -37,6 +37,11 @@ const config = {
     '!**/node_modules/**',
     '!**/.next/**',
   ],
+  
+  // node_modules 중 변환이 필요한 패키지 예외 처리
+  transformIgnorePatterns: [
+    'node_modules/(?!(@google/genai)/)',
+  ],
 }
 
 export default createJestConfig(config)
