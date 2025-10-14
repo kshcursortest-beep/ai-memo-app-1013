@@ -1,9 +1,9 @@
 // __tests__/unit/actions/notes.test.ts
 // 노트 Server Action 단위 테스트
-// createNote, getNotes, getNoteById 함수의 다양한 시나리오 검증
+// createNote, getNotes, getNoteById, updateNote 함수의 다양한 시나리오 검증
 // 관련 파일: app/actions/notes.ts
 
-import { createNote, getNotes, getNoteById } from '@/app/actions/notes'
+import { createNote, getNotes, getNoteById, updateNote } from '@/app/actions/notes'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 
@@ -540,6 +540,261 @@ describe('getNoteById Server Action', () => {
       // Then: 에러 응답
       expect(result.success).toBe(false)
       expect(result.error).toBe('노트를 불러올 수 없습니다. 다시 시도해주세요.')
+    })
+  })
+})
+
+describe('updateNote Server Action', () => {
+  const mockUser = { id: 'user-123', email: 'test@example.com' }
+  const mockNote = {
+    id: 'note-123',
+    title: 'Updated Title',
+    content: 'Updated Content',
+    createdAt: new Date('2025-10-14T10:00:00Z'),
+    updatedAt: new Date('2025-10-14T12:00:00Z'),
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('인증 검증', () => {
+    it('미인증 사용자는 노트를 수정할 수 없다', async () => {
+      // Given: 인증되지 않은 사용자
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: null },
+            error: new Error('Unauthorized'),
+          }),
+        },
+      })
+
+      // When: 노트 수정 시도
+      const result = await updateNote('note-123', 'New Title', 'New Content')
+
+      // Then: 인증 에러 반환
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('로그인이 필요합니다.')
+      expect(result.data).toBeUndefined()
+    })
+  })
+
+  describe('유효성 검사', () => {
+    beforeEach(() => {
+      // 인증된 사용자로 설정
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('제목이 비어있으면 에러를 반환한다', async () => {
+      // When: 빈 제목으로 수정 시도
+      const result = await updateNote('note-123', '', 'Content')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('제목을 입력해주세요.')
+    })
+
+    it('제목이 공백만 있으면 에러를 반환한다', async () => {
+      // When: 공백만 있는 제목으로 수정 시도
+      const result = await updateNote('note-123', '   ', 'Content')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('제목을 입력해주세요.')
+    })
+
+    it('제목이 500자를 초과하면 에러를 반환한다', async () => {
+      // Given: 500자 초과 제목
+      const longTitle = 'A'.repeat(501)
+
+      // When: 긴 제목으로 수정 시도
+      const result = await updateNote('note-123', longTitle, 'Content')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('제목은 최대 500자까지 입력 가능합니다.')
+    })
+
+    it('본문이 비어있으면 에러를 반환한다', async () => {
+      // When: 빈 본문으로 수정 시도
+      const result = await updateNote('note-123', 'Title', '')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('본문을 입력해주세요.')
+    })
+
+    it('본문이 공백만 있으면 에러를 반환한다', async () => {
+      // When: 공백만 있는 본문으로 수정 시도
+      const result = await updateNote('note-123', 'Title', '   ')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('본문을 입력해주세요.')
+    })
+  })
+
+  describe('노트 수정', () => {
+    beforeEach(() => {
+      // 인증된 사용자로 설정
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('정상적으로 노트를 수정한다', async () => {
+      // Given: DB 업데이트 성공
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([mockNote]),
+          }),
+        }),
+      })
+
+      // When: 노트 수정
+      const result = await updateNote('note-123', 'Updated Title', 'Updated Content')
+
+      // Then: 성공 응답
+      expect(result.success).toBe(true)
+      expect(result.data).toEqual(mockNote)
+      expect(result.error).toBeUndefined()
+    })
+
+    it('updated_at이 자동으로 갱신된다', async () => {
+      // Given: DB 업데이트 성공
+      const originalTime = new Date('2025-10-14T10:00:00Z')
+      const updatedTime = new Date('2025-10-14T12:00:00Z')
+      
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([
+              {
+                ...mockNote,
+                createdAt: originalTime,
+                updatedAt: updatedTime,
+              },
+            ]),
+          }),
+        }),
+      })
+
+      // When: 노트 수정
+      const result = await updateNote('note-123', 'Title', 'Content')
+
+      // Then: updated_at이 갱신됨
+      expect(result.success).toBe(true)
+      expect(result.data?.updatedAt.getTime()).toBeGreaterThan(result.data!.createdAt.getTime())
+    })
+
+    it('제목과 본문의 앞뒤 공백을 제거한다', async () => {
+      // Given: DB 업데이트 성공
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([
+              {
+                ...mockNote,
+                title: 'Trimmed Title',
+                content: 'Trimmed Content',
+              },
+            ]),
+          }),
+        }),
+      })
+
+      // When: 공백이 포함된 입력으로 수정
+      const result = await updateNote('note-123', '  Trimmed Title  ', '  Trimmed Content  ')
+
+      // Then: 공백이 제거됨
+      expect(result.success).toBe(true)
+      expect(result.data?.title).toBe('Trimmed Title')
+      expect(result.data?.content).toBe('Trimmed Content')
+    })
+
+    it('존재하지 않는 노트 ID로 수정 시 에러를 반환한다', async () => {
+      // Given: DB에 노트 없음
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+
+      // When: 존재하지 않는 노트 수정 시도
+      const result = await updateNote('non-existent-id', 'Title', 'Content')
+
+      // Then: Not Found 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+      expect(result.data).toBeUndefined()
+    })
+
+    it('다른 사용자의 노트는 수정할 수 없다 (사용자 스코프 검증)', async () => {
+      // Given: 다른 사용자의 노트 (WHERE 조건으로 필터링됨)
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]), // 권한 없어서 빈 배열
+          }),
+        }),
+      })
+
+      // When: 다른 사용자의 노트 수정 시도
+      const result = await updateNote('other-user-note-id', 'Title', 'Content')
+
+      // Then: Not Found 에러 (보안상 403이 아닌 404로 처리)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+    })
+
+    it('유효하지 않은 노트 ID로 수정 시 에러를 반환한다', async () => {
+      // When: 빈 ID로 수정
+      const result1 = await updateNote('', 'Title', 'Content')
+
+      // Then: 유효성 검사 에러
+      expect(result1.success).toBe(false)
+      expect(result1.error).toBe('유효하지 않은 노트 ID입니다.')
+
+      // When: null ID로 수정 (타입 강제)
+      const result2 = await updateNote(null as any, 'Title', 'Content')
+
+      // Then: 유효성 검사 에러
+      expect(result2.success).toBe(false)
+      expect(result2.error).toBe('유효하지 않은 노트 ID입니다.')
+    })
+
+    it('DB 에러 발생 시 적절한 에러 메시지를 반환한다', async () => {
+      // Given: DB 에러 발생
+      ;(db.update as jest.Mock) = jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockRejectedValue(new Error('DB Error')),
+          }),
+        }),
+      })
+
+      // When: 노트 수정 시도
+      const result = await updateNote('note-123', 'Title', 'Content')
+
+      // Then: 에러 응답
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('저장에 실패했습니다. 다시 시도해주세요.')
     })
   })
 })

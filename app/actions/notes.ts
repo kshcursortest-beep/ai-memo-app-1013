@@ -235,3 +235,107 @@ export async function getNoteById(
   }
 }
 
+/**
+ * 노트 수정
+ * @param noteId - 수정할 노트 ID
+ * @param title - 새 제목
+ * @param content - 새 본문
+ * @returns 수정된 노트 정보 또는 에러 메시지
+ */
+export async function updateNote(
+  noteId: string,
+  title: string,
+  content: string
+): Promise<{
+  success: boolean
+  data?: {
+    id: string
+    title: string
+    content: string
+    createdAt: Date
+    updatedAt: Date
+  }
+  error?: string
+}> {
+  try {
+    // 1. 사용자 인증 확인
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: '로그인이 필요합니다.',
+      }
+    }
+
+    // 2. 노트 ID 유효성 검사
+    if (!noteId || typeof noteId !== 'string') {
+      return {
+        success: false,
+        error: '유효하지 않은 노트 ID입니다.',
+      }
+    }
+
+    // 3. 입력값 유효성 검사
+    const trimmedTitle = title.trim()
+    const trimmedContent = content.trim()
+
+    if (!trimmedTitle) {
+      return {
+        success: false,
+        error: '제목을 입력해주세요.',
+      }
+    }
+
+    if (trimmedTitle.length > 500) {
+      return {
+        success: false,
+        error: '제목은 최대 500자까지 입력 가능합니다.',
+      }
+    }
+
+    if (!trimmedContent) {
+      return {
+        success: false,
+        error: '본문을 입력해주세요.',
+      }
+    }
+
+    // 4. 노트 업데이트 (사용자 스코프 강제)
+    const [updatedNote] = await db
+      .update(notes)
+      .set({
+        title: trimmedTitle,
+        content: trimmedContent,
+      })
+      .where(and(eq(notes.id, noteId), eq(notes.userId, user.id)))
+      .returning({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+      })
+
+    // 5. 노트 없음 (존재하지 않거나 권한 없음)
+    if (!updatedNote) {
+      return {
+        success: false,
+        error: '노트를 찾을 수 없습니다.',
+      }
+    }
+
+    return {
+      success: true,
+      data: updatedNote,
+    }
+  } catch (error) {
+    console.error('노트 수정 실패:', error)
+    return {
+      success: false,
+      error: '저장에 실패했습니다. 다시 시도해주세요.',
+    }
+  }
+}
+
