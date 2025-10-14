@@ -8,7 +8,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { notes } from '@/drizzle/schema'
-import { eq, desc, count } from 'drizzle-orm'
+import { eq, desc, count, and } from 'drizzle-orm'
 
 /**
  * 새로운 노트 생성
@@ -159,6 +159,78 @@ export async function getNotes(
     return {
       success: false,
       error: '노트 목록을 불러올 수 없습니다. 다시 시도해주세요.',
+    }
+  }
+}
+
+/**
+ * 노트 상세 조회
+ * @param noteId - 조회할 노트 ID
+ * @returns 노트 상세 정보 또는 에러 메시지
+ */
+export async function getNoteById(
+  noteId: string
+): Promise<{
+  success: boolean
+  data?: {
+    id: string
+    title: string
+    content: string
+    createdAt: Date
+    updatedAt: Date
+  }
+  error?: string
+}> {
+  try {
+    // 1. 사용자 인증 확인
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: '로그인이 필요합니다.',
+      }
+    }
+
+    // 2. 노트 ID 유효성 검사
+    if (!noteId || typeof noteId !== 'string') {
+      return {
+        success: false,
+        error: '유효하지 않은 노트 ID입니다.',
+      }
+    }
+
+    // 3. 노트 조회 (사용자 스코프 강제)
+    const [note] = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+      })
+      .from(notes)
+      .where(and(eq(notes.id, noteId), eq(notes.userId, user.id)))
+      .limit(1)
+
+    // 4. 노트 없음 (존재하지 않거나 권한 없음)
+    if (!note) {
+      return {
+        success: false,
+        error: '노트를 찾을 수 없습니다.',
+      }
+    }
+
+    return {
+      success: true,
+      data: note,
+    }
+  } catch (error) {
+    console.error('노트 조회 실패:', error)
+    return {
+      success: false,
+      error: '노트를 불러올 수 없습니다. 다시 시도해주세요.',
     }
   }
 }

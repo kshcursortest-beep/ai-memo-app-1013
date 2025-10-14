@@ -1,9 +1,9 @@
 // __tests__/unit/actions/notes.test.ts
 // 노트 Server Action 단위 테스트
-// createNote, getNotes 함수의 다양한 시나리오 검증
+// createNote, getNotes, getNoteById 함수의 다양한 시나리오 검증
 // 관련 파일: app/actions/notes.ts
 
-import { createNote, getNotes } from '@/app/actions/notes'
+import { createNote, getNotes, getNoteById } from '@/app/actions/notes'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 
@@ -399,6 +399,147 @@ describe('getNotes Server Action', () => {
       // Then: 에러 응답
       expect(result.success).toBe(false)
       expect(result.error).toBe('노트 목록을 불러올 수 없습니다. 다시 시도해주세요.')
+    })
+  })
+})
+
+describe('getNoteById Server Action', () => {
+  const mockUser = { id: 'user-123', email: 'test@example.com' }
+  const mockNote = {
+    id: 'note-123',
+    title: 'Test Note',
+    content: 'Test Content',
+    createdAt: new Date('2025-10-14T10:00:00Z'),
+    updatedAt: new Date('2025-10-14T10:00:00Z'),
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('인증 검증', () => {
+    it('미인증 사용자는 노트를 조회할 수 없다', async () => {
+      // Given: 인증되지 않은 사용자
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: null },
+            error: new Error('Unauthorized'),
+          }),
+        },
+      })
+
+      // When: 노트 조회 시도
+      const result = await getNoteById('note-123')
+
+      // Then: 인증 에러 반환
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('로그인이 필요합니다.')
+      expect(result.data).toBeUndefined()
+    })
+  })
+
+  describe('노트 조회', () => {
+    beforeEach(() => {
+      // 인증된 사용자로 설정
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('정상적으로 노트를 조회한다', async () => {
+      // Given: DB에 노트 존재
+      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([mockNote]),
+          }),
+        }),
+      })
+
+      // When: 노트 조회
+      const result = await getNoteById('note-123')
+
+      // Then: 성공 응답
+      expect(result.success).toBe(true)
+      expect(result.data).toEqual(mockNote)
+      expect(result.error).toBeUndefined()
+    })
+
+    it('존재하지 않는 노트 ID로 조회 시 에러를 반환한다', async () => {
+      // Given: DB에 노트 없음
+      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+
+      // When: 존재하지 않는 노트 조회
+      const result = await getNoteById('non-existent-id')
+
+      // Then: Not Found 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+      expect(result.data).toBeUndefined()
+    })
+
+    it('다른 사용자의 노트는 조회할 수 없다 (사용자 스코프 검증)', async () => {
+      // Given: 다른 사용자의 노트 (WHERE 조건으로 필터링됨)
+      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]), // 권한 없어서 빈 배열
+          }),
+        }),
+      })
+
+      // When: 다른 사용자의 노트 조회 시도
+      const result = await getNoteById('other-user-note-id')
+
+      // Then: Not Found 에러 (보안상 403이 아닌 404로 처리)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+    })
+
+    it('유효하지 않은 노트 ID로 조회 시 에러를 반환한다', async () => {
+      // When: 빈 ID로 조회
+      const result1 = await getNoteById('')
+
+      // Then: 유효성 검사 에러
+      expect(result1.success).toBe(false)
+      expect(result1.error).toBe('유효하지 않은 노트 ID입니다.')
+
+      // When: null ID로 조회 (타입 강제)
+      const result2 = await getNoteById(null as any)
+
+      // Then: 유효성 검사 에러
+      expect(result2.success).toBe(false)
+      expect(result2.error).toBe('유효하지 않은 노트 ID입니다.')
+    })
+
+    it('DB 에러 발생 시 적절한 에러 메시지를 반환한다', async () => {
+      // Given: DB 에러 발생
+      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockRejectedValue(new Error('DB Error')),
+          }),
+        }),
+      })
+
+      // When: 노트 조회 시도
+      const result = await getNoteById('note-123')
+
+      // Then: 에러 응답
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 불러올 수 없습니다. 다시 시도해주세요.')
     })
   })
 })
