@@ -122,3 +122,4 @@ export function formatErrorMessage(error: AuthError): string {
   return error.message
 }
 
+

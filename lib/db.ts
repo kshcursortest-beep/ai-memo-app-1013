@@ -18,3 +18,4 @@ const client = postgres(connectionString, {
 // Drizzle 인스턴스
 export const db = drizzle(client, { schema })
 
+
