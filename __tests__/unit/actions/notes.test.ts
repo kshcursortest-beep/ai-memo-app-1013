@@ -1,9 +1,9 @@
 // __tests__/unit/actions/notes.test.ts
 // 노트 Server Action 단위 테스트
-// createNote 함수의 다양한 시나리오 검증
+// createNote, getNotes 함수의 다양한 시나리오 검증
 // 관련 파일: app/actions/notes.ts
 
-import { createNote } from '@/app/actions/notes'
+import { createNote, getNotes } from '@/app/actions/notes'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 
@@ -200,6 +200,205 @@ describe('createNote Server Action', () => {
       // Then: 에러 응답
       expect(result.success).toBe(false)
       expect(result.error).toBe('노트 저장에 실패했습니다. 다시 시도해주세요.')
+    })
+  })
+})
+
+describe('getNotes Server Action', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('인증 검증', () => {
+    it('미인증 사용자는 노트 목록을 조회할 수 없다', async () => {
+      // Given: 인증되지 않은 사용자
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: null },
+            error: new Error('Unauthorized'),
+          }),
+        },
+      })
+
+      // When: 노트 목록 조회 시도
+      const result = await getNotes()
+
+      // Then: 인증 에러 반환
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('로그인이 필요합니다.')
+      expect(result.data).toBeUndefined()
+    })
+  })
+
+  describe('노트 목록 조회', () => {
+    beforeEach(() => {
+      const mockUser = { id: 'user-123', email: 'test@example.com' }
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('정상적으로 노트 목록을 조회한다', async () => {
+      // Given: 사용자의 노트 3개
+      const mockNotes = [
+        { id: '1', title: 'Note 1', content: 'Content 1', createdAt: new Date(), updatedAt: new Date() },
+        { id: '2', title: 'Note 2', content: 'Content 2', createdAt: new Date(), updatedAt: new Date() },
+        { id: '3', title: 'Note 3', content: 'Content 3', createdAt: new Date(), updatedAt: new Date() },
+      ]
+
+      const mockSelect = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                offset: jest.fn().mockResolvedValue(mockNotes),
+              }),
+            }),
+          }),
+        }),
+      })
+
+      const mockCount = jest.fn().mockResolvedValue([{ count: 3 }])
+      ;(db.select as jest.Mock) = mockSelect.mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([{ count: 3 }]),
+        }),
+      })
+
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 3 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue(mockNotes),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 노트 목록 조회
+      const result = await getNotes(1, 10)
+
+      // Then: 성공 응답
+      expect(result.success).toBe(true)
+      expect(result.data?.notes).toEqual(mockNotes)
+      expect(result.data?.total).toBe(3)
+      expect(result.data?.page).toBe(1)
+      expect(result.data?.pageSize).toBe(10)
+      expect(result.data?.totalPages).toBe(1)
+    })
+
+    it('빈 목록을 올바르게 처리한다', async () => {
+      // Given: 노트가 없는 사용자
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 노트 목록 조회
+      const result = await getNotes(1, 10)
+
+      // Then: 빈 배열 반환
+      expect(result.success).toBe(true)
+      expect(result.data?.notes).toEqual([])
+      expect(result.data?.total).toBe(0)
+      expect(result.data?.totalPages).toBe(0)
+    })
+
+    it('페이지 번호가 0 이하면 1로 보정한다', async () => {
+      // Given: DB mock 설정
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 페이지 번호 0으로 조회
+      const result = await getNotes(0, 10)
+
+      // Then: 페이지 1로 조회
+      expect(result.data?.page).toBe(1)
+    })
+
+    it('페이지 크기를 최소 1, 최대 100으로 제한한다', async () => {
+      // Given: DB mock 설정
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 페이지 크기 200으로 조회
+      const result = await getNotes(1, 200)
+
+      // Then: 페이지 크기 100으로 제한
+      expect(result.data?.pageSize).toBe(100)
+    })
+
+    it('DB 에러 발생 시 적절한 에러 메시지를 반환한다', async () => {
+      // Given: DB 에러 발생
+      ;(db.select as jest.Mock) = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockRejectedValue(new Error('DB Error')),
+        }),
+      })
+
+      // When: 노트 목록 조회 시도
+      const result = await getNotes()
+
+      // Then: 에러 응답
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트 목록을 불러올 수 없습니다. 다시 시도해주세요.')
     })
   })
 })

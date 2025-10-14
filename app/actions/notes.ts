@@ -8,6 +8,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { notes } from '@/drizzle/schema'
+import { eq, desc, count } from 'drizzle-orm'
 
 /**
  * 새로운 노트 생성
@@ -72,6 +73,92 @@ export async function createNote(
     return {
       success: false,
       error: '노트 저장에 실패했습니다. 다시 시도해주세요.',
+    }
+  }
+}
+
+/**
+ * 노트 목록 조회 (페이지네이션)
+ * @param page - 페이지 번호 (1부터 시작)
+ * @param pageSize - 페이지당 노트 개수 (기본값: 10)
+ * @returns 노트 목록, 전체 개수, 페이지 정보
+ */
+export async function getNotes(
+  page: number = 1,
+  pageSize: number = 10
+): Promise<{
+  success: boolean
+  data?: {
+    notes: Array<{
+      id: string
+      title: string
+      content: string
+      createdAt: Date
+      updatedAt: Date
+    }>
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
+  error?: string
+}> {
+  try {
+    // 1. 사용자 인증 확인
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: '로그인이 필요합니다.',
+      }
+    }
+
+    // 2. 페이지 번호 검증
+    const currentPage = Math.max(1, page)
+    const limit = Math.max(1, Math.min(100, pageSize)) // 최대 100개
+
+    // 3. 전체 노트 개수 조회
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(notes)
+      .where(eq(notes.userId, user.id))
+
+    const total = countResult?.count || 0
+    const totalPages = Math.ceil(total / limit)
+
+    // 4. 노트 목록 조회 (페이지네이션)
+    const offset = (currentPage - 1) * limit
+    const notesList = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+      })
+      .from(notes)
+      .where(eq(notes.userId, user.id))
+      .orderBy(desc(notes.createdAt))
+      .limit(limit)
+      .offset(offset)
+
+    return {
+      success: true,
+      data: {
+        notes: notesList,
+        total,
+        page: currentPage,
+        pageSize: limit,
+        totalPages,
+      },
+    }
+  } catch (error) {
+    console.error('노트 목록 조회 실패:', error)
+    return {
+      success: false,
+      error: '노트 목록을 불러올 수 없습니다. 다시 시도해주세요.',
     }
   }
 }
