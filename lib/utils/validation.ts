@@ -1,7 +1,7 @@
 // lib/utils/validation.ts
 // 유효성 검사 유틸리티 함수들
-// 이메일 형식 검증, 비밀번호 강도 검사 등의 유틸리티 제공
-// 관련 파일: components/auth/SignUpForm.tsx, components/auth/PasswordStrength.tsx
+// 이메일 형식 검증, 비밀번호 강도 검사, 노트 유효성 검사 등의 유틸리티 제공
+// 관련 파일: components/auth/SignUpForm.tsx, components/notes/NoteCreateForm.tsx
 
 /**
  * 이메일 형식 검증
@@ -72,6 +72,52 @@ export function getPasswordStrengthColor(strength: number): string {
       return 'bg-yellow-500'
     case 'strong':
       return 'bg-green-500'
+  }
+}
+
+/**
+ * 노트 제목 유효성 검사
+ */
+export function validateNoteTitle(title: string): { valid: boolean; error?: string } {
+  const trimmed = title.trim()
+  
+  if (!trimmed) {
+    return { valid: false, error: '제목을 입력해주세요.' }
+  }
+  
+  if (trimmed.length > 500) {
+    return { valid: false, error: '제목은 최대 500자까지 입력 가능합니다.' }
+  }
+  
+  return { valid: true }
+}
+
+/**
+ * 노트 본문 유효성 검사
+ */
+export function validateNoteContent(content: string): { valid: boolean; error?: string } {
+  const trimmed = content.trim()
+  
+  if (!trimmed) {
+    return { valid: false, error: '본문을 입력해주세요.' }
+  }
+  
+  return { valid: true }
+}
+
+/**
+ * 노트 전체 유효성 검사
+ */
+export function validateNote(title: string, content: string): { valid: boolean; errors: { title?: string; content?: string } } {
+  const titleValidation = validateNoteTitle(title)
+  const contentValidation = validateNoteContent(content)
+  
+  return {
+    valid: titleValidation.valid && contentValidation.valid,
+    errors: {
+      title: titleValidation.error,
+      content: contentValidation.error,
+    }
   }
 }
 

@@ -48,8 +48,17 @@ export function Header({ user, onSignOut }: HeaderProps) {
           </a>
         </div>
 
-        {/* 사용자 정보 및 로그아웃 버튼 */}
+        {/* 네비게이션 및 사용자 정보 */}
         <div className="flex items-center space-x-4">
+          {/* 새 노트 작성 버튼 */}
+          <Button
+            onClick={() => router.push('/notes/new')}
+            size="sm"
+            aria-label="새 노트 작성"
+          >
+            + 새 노트
+          </Button>
+          
           <span className="text-sm text-gray-600">
             {user.email}
           </span>
