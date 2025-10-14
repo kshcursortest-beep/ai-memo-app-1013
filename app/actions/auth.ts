@@ -23,14 +23,20 @@ export async function signUpWithEmail(email: string, password: string) {
 
     if (error) {
       // 에러 메시지 처리
+      console.error('Supabase signup error:', error)
       let errorMessage = '회원가입 중 오류가 발생했습니다.'
       
-      if (error.message.includes('already registered')) {
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
         errorMessage = '이미 가입된 이메일입니다.'
       } else if (error.message.includes('invalid email')) {
         errorMessage = '올바른 이메일 형식이 아닙니다.'
-      } else if (error.message.includes('Password')) {
+      } else if (error.message.includes('Password') || error.message.includes('password')) {
         errorMessage = '비밀번호가 요구사항을 충족하지 않습니다.'
+      } else if (error.message.includes('Email rate limit exceeded')) {
+        errorMessage = '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.'
+      } else {
+        // 디버깅을 위해 실제 에러 메시지 포함
+        errorMessage = `회원가입 오류: ${error.message}`
       }
       
       return { error: errorMessage }
@@ -47,6 +53,53 @@ export async function signUpWithEmail(email: string, password: string) {
     return { error: '회원가입에 실패했습니다.' }
   } catch (error) {
     console.error('Sign up error:', error)
+    return { error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
+  }
+}
+
+/**
+ * 이메일/비밀번호 로그인
+ */
+export async function signInWithEmail(email: string, password: string) {
+  try {
+    const supabase = await createClient()
+
+    // Supabase Auth를 통한 로그인
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      // 에러 메시지 처리
+      console.error('Supabase signin error:', error)
+      let errorMessage = '로그인 중 오류가 발생했습니다.'
+      
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.'
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = '이메일 인증이 완료되지 않았습니다.'
+      } else if (error.message.includes('invalid email')) {
+        errorMessage = '올바른 이메일 형식이 아닙니다.'
+      } else {
+        // 디버깅을 위해 실제 에러 메시지 포함
+        errorMessage = `로그인 오류: ${error.message}`
+      }
+      
+      return { error: errorMessage }
+    }
+
+    // 로그인 성공 시 세션이 자동으로 쿠키에 저장됨
+    if (data.user) {
+      // 홈 페이지 재검증
+      revalidatePath('/')
+      
+      return { success: true, userId: data.user.id }
+    }
+
+    return { error: '로그인에 실패했습니다.' }
+  } catch (error) {
+    console.error('Sign in error:', error)
     return { error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
   }
 }
