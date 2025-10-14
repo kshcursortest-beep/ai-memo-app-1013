@@ -124,6 +124,73 @@ export async function getCurrentUser() {
 }
 
 /**
+ * 비밀번호 재설정 요청
+ */
+export async function requestPasswordReset(email: string) {
+  try {
+    const supabase = await createClient()
+
+    // Supabase Auth를 통한 비밀번호 재설정 이메일 발송
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/reset-password`,
+    })
+
+    if (error) {
+      console.error('Password reset request error:', error)
+    }
+
+    // 보안을 위해 이메일 존재 여부와 관계없이 동일한 성공 메시지 반환
+    return { 
+      success: true, 
+      message: '비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요.' 
+    }
+  } catch (error) {
+    console.error('Password reset request error:', error)
+    return { error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
+  }
+}
+
+/**
+ * 새 비밀번호 설정
+ */
+export async function updatePassword(newPassword: string) {
+  try {
+    const supabase = await createClient()
+
+    // Supabase Auth를 통한 비밀번호 업데이트
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) {
+      console.error('Password update error:', error)
+      let errorMessage = '비밀번호 변경 중 오류가 발생했습니다.'
+      
+      if (error.message.includes('same as the old password') || 
+          error.message.includes('should be different from the old password')) {
+        errorMessage = '새 비밀번호는 이전 비밀번호와 달라야 합니다.'
+      } else if (error.message.includes('Password') || error.message.includes('password')) {
+        errorMessage = '비밀번호가 요구사항을 충족하지 않습니다.'
+      } else {
+        errorMessage = `비밀번호 변경 오류: ${error.message}`
+      }
+      
+      return { error: errorMessage }
+    }
+
+    if (data.user) {
+      revalidatePath('/')
+      return { success: true, userId: data.user.id }
+    }
+
+    return { error: '비밀번호 변경에 실패했습니다.' }
+  } catch (error) {
+    console.error('Password update error:', error)
+    return { error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
+  }
+}
+
+/**
  * 로그아웃
  */
 export async function signOut() {

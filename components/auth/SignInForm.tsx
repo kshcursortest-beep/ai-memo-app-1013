@@ -127,7 +127,15 @@ export function SignInForm({ onSubmit }: SignInFormProps) {
 
           {/* 비밀번호 입력 */}
           <div className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">비밀번호</Label>
+              <a 
+                href="/forgot-password" 
+                className="text-xs text-blue-600 hover:text-blue-500"
+              >
+                비밀번호를 잊으셨나요?
+              </a>
+            </div>
             <Input
               id="password"
               type="password"

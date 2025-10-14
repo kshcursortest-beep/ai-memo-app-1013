@@ -71,3 +71,4 @@
 -   **브라우저 지원:** Chrome 25+, Safari 14.1+, Firefox 없음 (대체 UI 제공)
 -   **권한:** navigator.mediaDevices.getUserMedia() 필요
 -   **백업 방안:** STT 미지원 브라우저용 텍스트 입력 UI
+

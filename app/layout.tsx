@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { Header } from "@/components/layout/Header";
+import { getUser } from "@/app/actions/user";
+import { signOut } from "@/app/actions/auth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,16 +21,19 @@ export const metadata: Metadata = {
   description: "AI가 도와주는 스마트 메모장",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getUser()
+
   return (
     <html lang="ko">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Header user={user} onSignOut={signOut} />
         {children}
         <Toaster />
       </body>
