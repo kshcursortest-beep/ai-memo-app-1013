@@ -1,9 +1,9 @@
 // __tests__/unit/actions/notes.test.ts
 // 노트 Server Action 단위 테스트
-// createNote, getNotes, getNoteById, updateNote 함수의 다양한 시나리오 검증
+// createNote, getNotes, getNoteById, updateNote, deleteNote 함수의 다양한 시나리오 검증
 // 관련 파일: app/actions/notes.ts
 
-import { createNote, getNotes, getNoteById, updateNote } from '@/app/actions/notes'
+import { createNote, getNotes, getNoteById, updateNote, deleteNote } from '@/app/actions/notes'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 
@@ -795,6 +795,145 @@ describe('updateNote Server Action', () => {
       // Then: 에러 응답
       expect(result.success).toBe(false)
       expect(result.error).toBe('저장에 실패했습니다. 다시 시도해주세요.')
+    })
+  })
+})
+
+describe('deleteNote Server Action', () => {
+  const mockUser = { id: 'user-123', email: 'test@example.com' }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('인증 검증', () => {
+    it('미인증 사용자는 노트를 삭제할 수 없다', async () => {
+      // Given: 인증되지 않은 사용자
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: null },
+            error: new Error('Unauthorized'),
+          }),
+        },
+      })
+
+      // When: 노트 삭제 시도
+      const result = await deleteNote('note-123')
+
+      // Then: 인증 에러 반환
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('로그인이 필요합니다.')
+    })
+  })
+
+  describe('유효성 검사', () => {
+    beforeEach(() => {
+      // 인증된 사용자로 설정
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('빈 노트 ID로 삭제 시 에러를 반환한다', async () => {
+      // When: 빈 ID로 삭제 시도
+      const result = await deleteNote('')
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('유효하지 않은 노트 ID입니다.')
+    })
+
+    it('null 노트 ID로 삭제 시 에러를 반환한다', async () => {
+      // When: null ID로 삭제 시도 (타입 강제)
+      const result = await deleteNote(null as any)
+
+      // Then: 유효성 검사 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('유효하지 않은 노트 ID입니다.')
+    })
+  })
+
+  describe('노트 삭제', () => {
+    beforeEach(() => {
+      // 인증된 사용자로 설정
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('정상적으로 노트를 삭제한다', async () => {
+      // Given: DB 삭제 성공
+      ;(db.delete as jest.Mock) = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'note-123' }]),
+        }),
+      })
+
+      // When: 노트 삭제
+      const result = await deleteNote('note-123')
+
+      // Then: 성공 응답
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+    })
+
+    it('존재하지 않는 노트 ID로 삭제 시 에러를 반환한다', async () => {
+      // Given: DB에 노트 없음
+      ;(db.delete as jest.Mock) = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 빈 배열
+        }),
+      })
+
+      // When: 존재하지 않는 노트 삭제 시도
+      const result = await deleteNote('non-existent-id')
+
+      // Then: Not Found 에러
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+    })
+
+    it('다른 사용자의 노트는 삭제할 수 없다 (사용자 스코프 검증)', async () => {
+      // Given: 다른 사용자의 노트 (WHERE 조건으로 필터링됨)
+      ;(db.delete as jest.Mock) = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]), // 권한 없어서 빈 배열
+        }),
+      })
+
+      // When: 다른 사용자의 노트 삭제 시도
+      const result = await deleteNote('other-user-note-id')
+
+      // Then: Not Found 에러 (보안상 403이 아닌 404로 처리)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트를 찾을 수 없습니다.')
+    })
+
+    it('DB 에러 발생 시 적절한 에러 메시지를 반환한다', async () => {
+      // Given: DB 에러 발생
+      ;(db.delete as jest.Mock) = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockRejectedValue(new Error('DB Error')),
+        }),
+      })
+
+      // When: 노트 삭제 시도
+      const result = await deleteNote('note-123')
+
+      // Then: 에러 응답
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('노트 삭제에 실패했습니다. 다시 시도해주세요.')
     })
   })
 })

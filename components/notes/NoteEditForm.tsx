@@ -10,7 +10,18 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { updateNote } from '@/app/actions/notes'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { updateNote, deleteNote } from '@/app/actions/notes'
 import { formatDate } from '@/lib/utils/dateFormat'
 import { toast } from 'sonner'
 
@@ -36,6 +47,7 @@ export function NoteEditForm({ note }: NoteEditFormProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({})
   const [lastSaved, setLastSaved] = useState<Date>(note.updatedAt)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 변경사항 감지
   const hasChanges = title !== originalTitle || content !== originalContent
@@ -142,6 +154,27 @@ export function NoteEditForm({ note }: NoteEditFormProps) {
     setErrors({})
     setSaveStatus('idle')
     setIsEditing(false)
+  }
+
+  // 노트 삭제
+  const handleDelete = async () => {
+    setIsDeleting(true)
+
+    try {
+      const result = await deleteNote(note.id)
+
+      if (result.success) {
+        toast.success('노트가 삭제되었습니다')
+        router.push('/')
+      } else {
+        toast.error(result.error || '노트 삭제에 실패했습니다')
+        setIsDeleting(false)
+      }
+    } catch (error) {
+      console.error('삭제 실패:', error)
+      toast.error('노트 삭제에 실패했습니다. 다시 시도해주세요.')
+      setIsDeleting(false)
+    }
   }
 
   // 수동 저장 (Ctrl/Cmd + S)
@@ -296,7 +329,57 @@ export function NoteEditForm({ note }: NoteEditFormProps) {
 
               {/* 편집 버튼 */}
               {!isEditing ? (
-                <Button onClick={handleEdit}>수정</Button>
+                <div className="flex gap-2">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={isDeleting}>
+                        {isDeleting ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" viewBox="0 0 24 24">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            삭제 중...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            삭제
+                          </>
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>노트 삭제</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          정말 이 노트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+                          삭제
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <Button onClick={handleEdit}>수정</Button>
+                </div>
               ) : (
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handleCancel}>

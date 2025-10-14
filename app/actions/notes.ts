@@ -339,3 +339,60 @@ export async function updateNote(
   }
 }
 
+/**
+ * 노트 삭제
+ * @param noteId - 삭제할 노트 ID
+ * @returns 성공 여부 또는 에러 메시지
+ */
+export async function deleteNote(
+  noteId: string
+): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    // 1. 사용자 인증 확인
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: '로그인이 필요합니다.',
+      }
+    }
+
+    // 2. 노트 ID 유효성 검사
+    if (!noteId || typeof noteId !== 'string') {
+      return {
+        success: false,
+        error: '유효하지 않은 노트 ID입니다.',
+      }
+    }
+
+    // 3. 노트 삭제 (사용자 스코프 강제)
+    const result = await db
+      .delete(notes)
+      .where(and(eq(notes.id, noteId), eq(notes.userId, user.id)))
+      .returning({ id: notes.id })
+
+    // 4. 노트 없음 (존재하지 않거나 권한 없음)
+    if (result.length === 0) {
+      return {
+        success: false,
+        error: '노트를 찾을 수 없습니다.',
+      }
+    }
+
+    return {
+      success: true,
+    }
+  } catch (error) {
+    console.error('노트 삭제 실패:', error)
+    return {
+      success: false,
+      error: '노트 삭제에 실패했습니다. 다시 시도해주세요.',
+    }
+  }
+}
+
