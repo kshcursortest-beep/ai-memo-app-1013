@@ -401,6 +401,161 @@ describe('getNotes Server Action', () => {
       expect(result.error).toBe('노트 목록을 불러올 수 없습니다. 다시 시도해주세요.')
     })
   })
+
+  describe('정렬 기능', () => {
+    beforeEach(() => {
+      const mockUser = { id: 'user-123', email: 'test@example.com' }
+      ;(createClient as jest.Mock).mockResolvedValue({
+        auth: {
+          getUser: jest.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null,
+          }),
+        },
+      })
+    })
+
+    it('최신순 정렬 (latest)로 노트를 조회한다', async () => {
+      // Given: 노트 목록
+      const mockNotes = [
+        { id: '3', title: 'Note 3', content: 'Content 3', createdAt: new Date('2025-10-14'), updatedAt: new Date('2025-10-14') },
+        { id: '2', title: 'Note 2', content: 'Content 2', createdAt: new Date('2025-10-13'), updatedAt: new Date('2025-10-13') },
+        { id: '1', title: 'Note 1', content: 'Content 1', createdAt: new Date('2025-10-12'), updatedAt: new Date('2025-10-12') },
+      ]
+
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 3 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue(mockNotes),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 최신순 정렬로 조회
+      const result = await getNotes(1, 10, 'latest')
+
+      // Then: 최신순으로 정렬된 노트 반환
+      expect(result.success).toBe(true)
+      expect(result.data?.notes[0].id).toBe('3')
+      expect(result.data?.notes[1].id).toBe('2')
+      expect(result.data?.notes[2].id).toBe('1')
+    })
+
+    it('오래된순 정렬 (oldest)로 노트를 조회한다', async () => {
+      // Given: 노트 목록
+      const mockNotes = [
+        { id: '1', title: 'Note 1', content: 'Content 1', createdAt: new Date('2025-10-12'), updatedAt: new Date('2025-10-12') },
+        { id: '2', title: 'Note 2', content: 'Content 2', createdAt: new Date('2025-10-13'), updatedAt: new Date('2025-10-13') },
+        { id: '3', title: 'Note 3', content: 'Content 3', createdAt: new Date('2025-10-14'), updatedAt: new Date('2025-10-14') },
+      ]
+
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 3 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue(mockNotes),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 오래된순 정렬로 조회
+      const result = await getNotes(1, 10, 'oldest')
+
+      // Then: 오래된순으로 정렬된 노트 반환
+      expect(result.success).toBe(true)
+      expect(result.data?.notes[0].id).toBe('1')
+      expect(result.data?.notes[1].id).toBe('2')
+      expect(result.data?.notes[2].id).toBe('3')
+    })
+
+    it('제목순 정렬 (title)로 노트를 조회한다', async () => {
+      // Given: 노트 목록 (가나다순)
+      const mockNotes = [
+        { id: '1', title: '가나다', content: 'Content 1', createdAt: new Date('2025-10-12'), updatedAt: new Date('2025-10-12') },
+        { id: '2', title: '나다라', content: 'Content 2', createdAt: new Date('2025-10-13'), updatedAt: new Date('2025-10-13') },
+        { id: '3', title: '다라마', content: 'Content 3', createdAt: new Date('2025-10-14'), updatedAt: new Date('2025-10-14') },
+      ]
+
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 3 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue(mockNotes),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 제목순 정렬로 조회
+      const result = await getNotes(1, 10, 'title')
+
+      // Then: 제목순으로 정렬된 노트 반환
+      expect(result.success).toBe(true)
+      expect(result.data?.notes[0].title).toBe('가나다')
+      expect(result.data?.notes[1].title).toBe('나다라')
+      expect(result.data?.notes[2].title).toBe('다라마')
+    })
+
+    it('잘못된 정렬 옵션은 기본값(latest)으로 처리한다', async () => {
+      // Given: 노트 목록
+      const mockNotes = [
+        { id: '3', title: 'Note 3', content: 'Content 3', createdAt: new Date('2025-10-14'), updatedAt: new Date('2025-10-14') },
+        { id: '2', title: 'Note 2', content: 'Content 2', createdAt: new Date('2025-10-13'), updatedAt: new Date('2025-10-13') },
+      ]
+
+      ;(db.select as jest.Mock) = jest.fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 2 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue(mockNotes),
+                }),
+              }),
+            }),
+          }),
+        })
+
+      // When: 잘못된 정렬 옵션으로 조회 (타입 강제)
+      const result = await getNotes(1, 10, 'invalid' as any)
+
+      // Then: 기본값(latest)으로 정렬된 노트 반환
+      expect(result.success).toBe(true)
+      expect(result.data?.notes.length).toBe(2)
+    })
+  })
 })
 
 describe('getNoteById Server Action', () => {

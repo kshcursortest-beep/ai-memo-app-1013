@@ -1,6 +1,6 @@
 // app/page.tsx
 // AI 메모장 메인 페이지
-// 로그인 사용자 확인 및 온보딩 플로우 통합, 노트 목록 표시
+// 로그인 사용자 확인 및 온보딩 플로우 통합, 노트 목록 표시 및 정렬
 // 관련 파일: components/onboarding/OnboardingModal.tsx, app/actions/onboarding.ts, app/actions/notes.ts
 
 import { redirect } from 'next/navigation'
@@ -10,9 +10,11 @@ import { getNotes } from '@/app/actions/notes'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { NoteList } from '@/components/notes/NoteList'
 import { NotePagination } from '@/components/notes/NotePagination'
+import { NoteSortSelectorWrapper } from '@/components/notes/NoteSortSelectorWrapper'
+import { getSortOption } from '@/lib/types/notes'
 
 interface HomeProps {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; sort?: string }>
 }
 
 export default async function Home({ searchParams }: HomeProps) {
@@ -26,12 +28,13 @@ export default async function Home({ searchParams }: HomeProps) {
   // 온보딩 상태 확인
   const { hasCompletedOnboarding } = await getOnboardingStatus()
 
-  // URL 쿼리 파라미터에서 페이지 번호 읽기
+  // URL 쿼리 파라미터에서 페이지 번호 및 정렬 옵션 읽기
   const params = await searchParams
   const page = parseInt(params.page || '1', 10)
+  const sort = getSortOption(params.sort)
 
-  // 노트 목록 조회
-  const notesResult = hasCompletedOnboarding ? await getNotes(page, 10) : null
+  // 노트 목록 조회 (정렬 옵션 포함)
+  const notesResult = hasCompletedOnboarding ? await getNotes(page, 10, sort) : null
 
   return (
     <div className="min-h-screen">
@@ -56,11 +59,18 @@ export default async function Home({ searchParams }: HomeProps) {
         {/* 노트 목록 */}
         {hasCompletedOnboarding && notesResult?.success && (
           <>
+            {/* 정렬 옵션 */}
+            <div className="mb-6 flex justify-end">
+              <NoteSortSelectorWrapper currentSort={sort} />
+            </div>
+
             <NoteList notes={notesResult.data.notes} />
+            
             <NotePagination
               currentPage={notesResult.data.page}
               totalPages={notesResult.data.totalPages}
               total={notesResult.data.total}
+              currentSort={sort}
             />
           </>
         )}

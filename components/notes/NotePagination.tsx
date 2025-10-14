@@ -1,6 +1,6 @@
 // components/notes/NotePagination.tsx
 // 페이지네이션 컴포넌트
-// 이전/다음 버튼 및 현재 페이지 번호 표시
+// 이전/다음 버튼 및 현재 페이지 번호 표시, 정렬 상태 유지
 // 관련 파일: app/page.tsx
 
 'use client'
@@ -8,14 +8,16 @@
 import { Button } from '@/components/ui/button'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import type { SortOption } from '@/lib/types/notes'
 
 interface NotePaginationProps {
   currentPage: number
   totalPages: number
   total: number
+  currentSort: SortOption
 }
 
-export function NotePagination({ currentPage, totalPages, total }: NotePaginationProps) {
+export function NotePagination({ currentPage, totalPages, total, currentSort }: NotePaginationProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -27,6 +29,12 @@ export function NotePagination({ currentPage, totalPages, total }: NotePaginatio
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('page', newPage.toString())
+    
+    // 정렬 옵션 유지 (기본값이 아닌 경우에만 추가)
+    if (currentSort !== 'latest') {
+      params.set('sort', currentSort)
+    }
+    
     router.push(`/?${params.toString()}`)
   }
 

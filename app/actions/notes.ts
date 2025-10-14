@@ -8,7 +8,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { notes } from '@/drizzle/schema'
-import { eq, desc, count, and } from 'drizzle-orm'
+import { eq, desc, asc, count, and } from 'drizzle-orm'
+import type { SortOption } from '@/lib/types/notes'
+import { getSortOption } from '@/lib/types/notes'
 
 /**
  * 새로운 노트 생성
@@ -78,14 +80,16 @@ export async function createNote(
 }
 
 /**
- * 노트 목록 조회 (페이지네이션)
+ * 노트 목록 조회 (페이지네이션 + 정렬)
  * @param page - 페이지 번호 (1부터 시작)
  * @param pageSize - 페이지당 노트 개수 (기본값: 10)
+ * @param sortBy - 정렬 옵션 ('latest' | 'oldest' | 'title', 기본값: 'latest')
  * @returns 노트 목록, 전체 개수, 페이지 정보
  */
 export async function getNotes(
   page: number = 1,
-  pageSize: number = 10
+  pageSize: number = 10,
+  sortBy: SortOption = 'latest'
 ): Promise<{
   success: boolean
   data?: {
@@ -115,9 +119,10 @@ export async function getNotes(
       }
     }
 
-    // 2. 페이지 번호 검증
+    // 2. 페이지 번호 및 정렬 옵션 검증
     const currentPage = Math.max(1, page)
     const limit = Math.max(1, Math.min(100, pageSize)) // 최대 100개
+    const validSortBy = getSortOption(sortBy) // 유효성 검사 및 기본값 처리
 
     // 3. 전체 노트 개수 조회
     const [countResult] = await db
@@ -128,7 +133,13 @@ export async function getNotes(
     const total = countResult?.count || 0
     const totalPages = Math.ceil(total / limit)
 
-    // 4. 노트 목록 조회 (페이지네이션)
+    // 4. 정렬 옵션에 따라 orderBy 절 동적 구성
+    const orderByClause = 
+      validSortBy === 'latest' ? desc(notes.createdAt) :
+      validSortBy === 'oldest' ? asc(notes.createdAt) :
+      asc(notes.title) // 'title'
+
+    // 5. 노트 목록 조회 (페이지네이션 + 정렬)
     const offset = (currentPage - 1) * limit
     const notesList = await db
       .select({
@@ -140,7 +151,7 @@ export async function getNotes(
       })
       .from(notes)
       .where(eq(notes.userId, user.id))
-      .orderBy(desc(notes.createdAt))
+      .orderBy(orderByClause)
       .limit(limit)
       .offset(offset)
 
