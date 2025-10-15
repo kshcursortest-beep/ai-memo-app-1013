@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { NoteCreateForm } from '@/components/notes/NoteCreateForm'
+import { TempTagGenerator } from '@/components/notes/TempTagGenerator'
 import { createNote } from '@/app/actions/notes'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +31,7 @@ export default function NewNotePage() {
   const [recoveredDraft, setRecoveredDraft] = useState<NoteDraft | null>(null)
   const [currentTitle, setCurrentTitle] = useState('')
   const [currentContent, setCurrentContent] = useState('')
+  const [tempTags, setTempTags] = useState<string[]>([])
 
   // 사용자 인증 확인 및 템플릿/임시 저장 적용
   useEffect(() => {
@@ -120,11 +122,15 @@ export default function NewNotePage() {
     setCurrentContent(content)
   }, [])
 
+  const handleTagsGenerated = useCallback((tags: string[]) => {
+    setTempTags(tags)
+  }, [])
+
   const handleSubmit = async (title: string, content: string) => {
     setIsSubmitting(true)
     
     try {
-      const result = await createNote(title, content)
+      const result = await createNote(title, content, tempTags)
 
       if (result.success) {
         // 임시 저장 삭제
@@ -169,14 +175,22 @@ export default function NewNotePage() {
           <DraftStatusIndicator status={draftStatus} />
         </div>
 
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <NoteCreateForm 
-            onSubmit={handleSubmit} 
-            isSubmitting={isSubmitting}
-            initialTitle={initialTitle}
-            initialContent={initialContent}
-            onTitleChange={handleTitleChange}
-            onContentChange={handleContentChange}
+        <div className="space-y-6">
+          <div className="rounded-lg border bg-card p-6 shadow-sm">
+            <NoteCreateForm 
+              onSubmit={handleSubmit} 
+              isSubmitting={isSubmitting}
+              initialTitle={initialTitle}
+              initialContent={initialContent}
+              onTitleChange={handleTitleChange}
+              onContentChange={handleContentChange}
+            />
+          </div>
+
+          {/* AI 태그 미리보기 */}
+          <TempTagGenerator
+            content={currentContent}
+            onTagsGenerated={handleTagsGenerated}
           />
         </div>
       </div>

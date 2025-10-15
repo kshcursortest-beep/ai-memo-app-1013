@@ -18,7 +18,7 @@ export enum AuthErrorType {
 export interface AuthError {
   type: AuthErrorType
   message: string
-  originalError?: any
+  originalError?: unknown
   action?: string
 }
 
@@ -33,5 +33,6 @@ export const ERROR_MESSAGES: Record<AuthErrorType, string> = {
   [AuthErrorType.INVALID_CREDENTIALS]: '이메일 또는 비밀번호가 올바르지 않습니다.',
   [AuthErrorType.UNKNOWN_ERROR]: '알 수 없는 오류가 발생했습니다.',
 }
+
 
 

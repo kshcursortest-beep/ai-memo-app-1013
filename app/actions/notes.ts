@@ -7,7 +7,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { notes } from '@/drizzle/schema'
+import { notes, noteTags } from '@/drizzle/schema'
 import { eq, desc, asc, count, and } from 'drizzle-orm'
 import type { SortOption } from '@/lib/types/notes'
 import { getSortOption } from '@/lib/types/notes'
@@ -16,11 +16,13 @@ import { getSortOption } from '@/lib/types/notes'
  * 새로운 노트 생성
  * @param title - 노트 제목 (최대 500자)
  * @param content - 노트 본문
+ * @param tags - 함께 저장할 태그 목록 (선택사항)
  * @returns 성공 여부, 생성된 노트 ID 또는 에러 메시지
  */
 export async function createNote(
   title: string,
-  content: string
+  content: string,
+  tags?: string[]
 ): Promise<{ success: boolean; noteId?: string; error?: string }> {
   try {
     // 1. 사용자 인증 확인
@@ -65,6 +67,20 @@ export async function createNote(
       title: trimmedTitle,
       content: trimmedContent,
     }).returning()
+
+    // 4. 태그가 있으면 함께 저장
+    if (tags && tags.length > 0) {
+      const validTags = tags.filter(tag => tag.trim().length > 0 && tag.trim().length <= 50)
+      
+      if (validTags.length > 0) {
+        await db.insert(noteTags).values(
+          validTags.map(tag => ({
+            noteId: newNote.id,
+            tag: tag.trim(),
+          }))
+        )
+      }
+    }
 
     return {
       success: true,

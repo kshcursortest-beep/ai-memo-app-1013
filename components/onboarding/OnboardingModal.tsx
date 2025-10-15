@@ -80,7 +80,7 @@ export function OnboardingModal({ open, onComplete, onSkip, onOpenChange }: Onbo
         router.push('/')
         router.refresh()
       }
-    } catch (error) {
+    } catch {
       toast.error('온보딩 완료 처리 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
@@ -97,7 +97,7 @@ export function OnboardingModal({ open, onComplete, onSkip, onOpenChange }: Onbo
         router.push('/')
         router.refresh()
       }
-    } catch (error) {
+    } catch {
       toast.error('건너뛰기 처리 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)

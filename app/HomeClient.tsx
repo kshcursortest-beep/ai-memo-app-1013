@@ -23,7 +23,7 @@ interface Note {
 interface NotesResult {
   success: boolean
   error?: string
-  data: {
+  data?: {
     notes: Note[]
     page: number
     totalPages: number
@@ -77,19 +77,19 @@ export function HomeClient({
         {hasCompletedOnboarding && notesResult?.success && (
           <>
             {/* 정렬 옵션 */}
-            {notesResult.data.notes.length > 0 && (
+            {notesResult.data?.notes && notesResult.data.notes.length > 0 && (
               <div className="mb-6 flex justify-end">
                 <NoteSortSelectorWrapper currentSort={currentSort} />
               </div>
             )}
 
             <NoteList 
-              notes={notesResult.data.notes} 
+              notes={notesResult.data?.notes || []} 
               hasCompletedOnboarding={hasCompletedOnboarding}
               onShowOnboarding={handleShowOnboarding}
             />
 
-            {notesResult.data.notes.length > 0 && (
+            {notesResult.data && notesResult.data.notes.length > 0 && (
               <NotePagination
                 currentPage={currentPage}
                 totalPages={notesResult.data.totalPages}

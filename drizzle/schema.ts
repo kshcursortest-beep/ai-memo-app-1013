@@ -3,7 +3,7 @@
 // 테이블: user_profiles, notes, note_tags, summaries
 // 관련 파일: lib/db.ts, app/actions/onboarding.ts, app/actions/notes.ts
 
-import { pgTable, uuid, boolean, timestamp, varchar, text, index, unique } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, boolean, timestamp, varchar, text, index, unique, integer, decimal } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 /**
@@ -64,6 +64,51 @@ export const summaries = pgTable('summaries', {
   content: text('content').notNull(), // 요약 내용 (3-6 불릿 포인트)
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
+
+/**
+ * AI 재생성 기록 테이블
+ * 사용자별 재생성 횟수 추적 및 제한 관리
+ * 외래 키: CASCADE DELETE (사용자 삭제 시 기록도 함께 삭제)
+ */
+export const aiRegenerations = pgTable('ai_regenerations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull(), // Supabase Auth user ID
+  noteId: uuid('note_id').notNull().references(() => notes.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 10 }).notNull(), // 'summary' 또는 'tags'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  // 사용자별 재생성 횟수 조회 최적화
+  userIdTypeIdx: index('ai_regenerations_user_id_type_idx').on(table.userId, table.type),
+  // 일일 제한 확인을 위한 날짜별 조회 최적화
+  createdAtIdx: index('ai_regenerations_created_at_idx').on(table.createdAt),
+}))
+
+/**
+ * 토큰 사용량 테이블
+ * AI 요청별 토큰 사용량 추적 및 비용 관리
+ * 외래 키: CASCADE DELETE (사용자/노트 삭제 시 기록도 함께 삭제)
+ */
+export const tokenUsage = pgTable('token_usage', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull(), // Supabase Auth user ID
+  noteId: uuid('note_id').notNull().references(() => notes.id, { onDelete: 'cascade' }),
+  operationType: varchar('operation_type', { length: 20 }).notNull(), // 'summary', 'tags', 'regeneration'
+  inputTokens: integer('input_tokens').notNull(),
+  outputTokens: integer('output_tokens').notNull(),
+  totalTokens: integer('total_tokens').notNull(),
+  costUsd: decimal('cost_usd', { precision: 10, scale: 6 }), // 비용 (USD)
+  model: varchar('model', { length: 100 }).notNull(), // 사용된 AI 모델
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  // 사용자별 토큰 사용량 조회 최적화
+  userIdIdx: index('token_usage_user_id_idx').on(table.userId),
+  // 날짜별 사용량 집계 최적화
+  createdAtIdx: index('token_usage_created_at_idx').on(table.createdAt),
+  // 사용자별 날짜별 조회 최적화
+  userIdCreatedAtIdx: index('token_usage_user_id_created_at_idx').on(table.userId, table.createdAt),
+  // 작업 타입별 조회 최적화
+  operationTypeIdx: index('token_usage_operation_type_idx').on(table.operationType),
+}))
 
 /**
  * 노트 관계 정의

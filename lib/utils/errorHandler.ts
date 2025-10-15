@@ -8,9 +8,10 @@ import { AuthError, AuthErrorType, ERROR_MESSAGES } from '@/lib/types/errors'
 /**
  * 인증 에러 분석 및 처리
  */
-export function handleAuthError(error: any): AuthError {
+export function handleAuthError(error: unknown): AuthError {
   // 네트워크 에러
-  if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+  if (error && typeof error === 'object' && 'message' in error && 
+      (String(error.message).includes('Network') || String(error.message).includes('fetch'))) {
     return {
       type: AuthErrorType.NETWORK_ERROR,
       message: ERROR_MESSAGES[AuthErrorType.NETWORK_ERROR],
@@ -20,9 +21,11 @@ export function handleAuthError(error: any): AuthError {
   }
 
   // Supabase Auth 에러
-  if (error.message) {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String(error.message)
+    
     // 세션 만료
-    if (error.message.includes('Session') || error.message.includes('expired')) {
+    if (message.includes('Session') || message.includes('expired')) {
       return {
         type: AuthErrorType.SESSION_EXPIRED,
         message: ERROR_MESSAGES[AuthErrorType.SESSION_EXPIRED],
@@ -32,7 +35,7 @@ export function handleAuthError(error: any): AuthError {
     }
 
     // 이메일 미확인
-    if (error.message.includes('Email not confirmed')) {
+    if (message.includes('Email not confirmed')) {
       return {
         type: AuthErrorType.EMAIL_NOT_CONFIRMED,
         message: ERROR_MESSAGES[AuthErrorType.EMAIL_NOT_CONFIRMED],
@@ -42,7 +45,7 @@ export function handleAuthError(error: any): AuthError {
     }
 
     // 인증 실패
-    if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email')) {
+    if (message.includes('Invalid login credentials') || message.includes('Invalid email')) {
       return {
         type: AuthErrorType.INVALID_CREDENTIALS,
         message: ERROR_MESSAGES[AuthErrorType.INVALID_CREDENTIALS],
@@ -52,7 +55,7 @@ export function handleAuthError(error: any): AuthError {
     }
 
     // 권한 에러
-    if (error.message.includes('Permission') || error.message.includes('403')) {
+    if (message.includes('Permission') || message.includes('403')) {
       return {
         type: AuthErrorType.PERMISSION_DENIED,
         message: ERROR_MESSAGES[AuthErrorType.PERMISSION_DENIED],
@@ -63,8 +66,10 @@ export function handleAuthError(error: any): AuthError {
   }
 
   // HTTP 상태 코드 기반 에러
-  if (error.status) {
-    if (error.status >= 500) {
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = error.status as number
+    
+    if (status >= 500) {
       return {
         type: AuthErrorType.SERVER_ERROR,
         message: ERROR_MESSAGES[AuthErrorType.SERVER_ERROR],
@@ -73,7 +78,7 @@ export function handleAuthError(error: any): AuthError {
       }
     }
 
-    if (error.status >= 400 && error.status < 500) {
+    if (status >= 400 && status < 500) {
       return {
         type: AuthErrorType.CLIENT_ERROR,
         message: ERROR_MESSAGES[AuthErrorType.CLIENT_ERROR],
@@ -86,7 +91,7 @@ export function handleAuthError(error: any): AuthError {
   // 기본 에러
   return {
     type: AuthErrorType.UNKNOWN_ERROR,
-    message: error.message || ERROR_MESSAGES[AuthErrorType.UNKNOWN_ERROR],
+    message: (error && typeof error === 'object' && 'message' in error ? String(error.message) : '') || ERROR_MESSAGES[AuthErrorType.UNKNOWN_ERROR],
     originalError: error,
     action: 'retry',
   }
@@ -121,5 +126,6 @@ export function getErrorAction(errorType: AuthErrorType): {
 export function formatErrorMessage(error: AuthError): string {
   return error.message
 }
+
 
 

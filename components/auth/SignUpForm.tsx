@@ -86,7 +86,7 @@ export function SignUpForm({ onSubmit }: SignUpFormProps) {
         toast.success('회원가입이 완료되었습니다!')
         router.push('/')
       }
-    } catch (error) {
+    } catch {
       const errorMessage = '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.'
       setFormError(errorMessage)
       toast.error(errorMessage)

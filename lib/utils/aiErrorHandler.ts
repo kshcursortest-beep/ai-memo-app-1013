@@ -10,9 +10,10 @@ import { AIError, AIErrorType, AI_ERROR_MESSAGES } from '@/lib/types/ai'
  * @param error - 발생한 에러 객체
  * @returns AIError 객체 (타입, 메시지, 추천 액션 포함)
  */
-export function handleAIError(error: any): AIError {
+export function handleAIError(error: unknown): AIError {
   // 타임아웃 에러
-  if (error.message?.includes('Timeout') || error.message?.includes('timeout')) {
+  if (error && typeof error === 'object' && 'message' in error && 
+      (String(error.message).includes('Timeout') || String(error.message).includes('timeout'))) {
     return {
       type: AIErrorType.TIMEOUT,
       message: AI_ERROR_MESSAGES[AIErrorType.TIMEOUT],
@@ -22,7 +23,8 @@ export function handleAIError(error: any): AIError {
   }
 
   // API 키 누락 에러
-  if (error.message?.includes('API key') || error.message?.includes('GEMINI_API_KEY')) {
+  if (error && typeof error === 'object' && 'message' in error && 
+      (String(error.message).includes('API key') || String(error.message).includes('GEMINI_API_KEY'))) {
     return {
       type: AIErrorType.API_KEY_MISSING,
       message: AI_ERROR_MESSAGES[AIErrorType.API_KEY_MISSING],
@@ -32,8 +34,9 @@ export function handleAIError(error: any): AIError {
   }
 
   // Gemini API 에러 (status code 기반)
-  if (error.status || error.statusCode) {
-    const status = error.status || error.statusCode
+  if (error && typeof error === 'object' && ('status' in error || 'statusCode' in error)) {
+    const statusValue = 'status' in error ? error.status : 'statusCode' in error ? error.statusCode : null
+    const status = typeof statusValue === 'number' ? statusValue : null
 
     // 할당량 초과 (429)
     if (status === 429) {
@@ -46,7 +49,7 @@ export function handleAIError(error: any): AIError {
     }
 
     // 잘못된 요청 (400, 401, 403)
-    if (status >= 400 && status < 500) {
+    if (status && status >= 400 && status < 500) {
       return {
         type: AIErrorType.INVALID_REQUEST,
         message: AI_ERROR_MESSAGES[AIErrorType.INVALID_REQUEST],
@@ -56,7 +59,7 @@ export function handleAIError(error: any): AIError {
     }
 
     // 서버 에러 (500+)
-    if (status >= 500) {
+    if (status && status >= 500) {
       return {
         type: AIErrorType.SERVER_ERROR,
         message: AI_ERROR_MESSAGES[AIErrorType.SERVER_ERROR],
@@ -67,9 +70,11 @@ export function handleAIError(error: any): AIError {
   }
 
   // Gemini API 에러 메시지 기반
-  if (error.message) {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String(error.message)
+    
     // 할당량 초과
-    if (error.message.includes('quota') || error.message.includes('rate limit')) {
+    if (message.includes('quota') || message.includes('rate limit')) {
       return {
         type: AIErrorType.QUOTA_EXCEEDED,
         message: AI_ERROR_MESSAGES[AIErrorType.QUOTA_EXCEEDED],
@@ -79,7 +84,7 @@ export function handleAIError(error: any): AIError {
     }
 
     // 인증 실패
-    if (error.message.includes('authentication') || error.message.includes('unauthorized')) {
+    if (message.includes('authentication') || message.includes('unauthorized')) {
       return {
         type: AIErrorType.API_KEY_MISSING,
         message: AI_ERROR_MESSAGES[AIErrorType.API_KEY_MISSING],
@@ -89,7 +94,7 @@ export function handleAIError(error: any): AIError {
     }
 
     // 잘못된 요청
-    if (error.message.includes('invalid') || error.message.includes('bad request')) {
+    if (message.includes('invalid') || message.includes('bad request')) {
       return {
         type: AIErrorType.INVALID_REQUEST,
         message: AI_ERROR_MESSAGES[AIErrorType.INVALID_REQUEST],
@@ -102,7 +107,7 @@ export function handleAIError(error: any): AIError {
   // 기본 에러
   return {
     type: AIErrorType.UNKNOWN_ERROR,
-    message: error.message || AI_ERROR_MESSAGES[AIErrorType.UNKNOWN_ERROR],
+    message: (error && typeof error === 'object' && 'message' in error ? String(error.message) : '') || AI_ERROR_MESSAGES[AIErrorType.UNKNOWN_ERROR],
     originalError: error,
     action: 'contact-support',
   }

@@ -4,9 +4,10 @@
 // 관련 파일: app/actions/notes.ts, components/notes/NoteEditForm.tsx, components/notes/SummaryDisplay.tsx
 
 import { getNoteById } from '@/app/actions/notes'
+import { getTags } from '@/app/actions/tags'
 import { NoteEditForm } from '@/components/notes/NoteEditForm'
-import { SummaryDisplay } from '@/components/notes/SummaryDisplay'
 import { SummarySection } from '@/components/notes/SummarySection'
+import { TagSection } from '@/components/notes/TagSection'
 import { notFound } from 'next/navigation'
 
 interface NoteDetailPageProps {
@@ -23,6 +24,10 @@ export default async function NoteDetailPage({ params }: NoteDetailPageProps) {
     notFound()
   }
 
+  // 태그 데이터 로드
+  const tagsResult = await getTags(params.id)
+  const initialTags = tagsResult.success ? tagsResult.tags || [] : []
+
   return (
     <div className="space-y-6">
       {/* 노트 편집 폼 */}
@@ -32,6 +37,12 @@ export default async function NoteDetailPage({ params }: NoteDetailPageProps) {
       <SummarySection
         noteId={result.data.id}
         initialSummary={result.data.summary}
+      />
+
+      {/* AI 태그 섹션 */}
+      <TagSection 
+        noteId={result.data.id} 
+        initialTags={initialTags}
       />
     </div>
   )

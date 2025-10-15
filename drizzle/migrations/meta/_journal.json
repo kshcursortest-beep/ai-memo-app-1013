@@ -8,6 +8,20 @@
       "when": 1760406580571,
       "tag": "0000_cynical_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1760488246078,
+      "tag": "0001_opposite_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1760489609430,
+      "tag": "0002_rapid_imperial_guard",
+      "breakpoints": true
     }
   ]
 }
